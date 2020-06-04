@@ -33,8 +33,7 @@ class FailureBuyResult extends BuyResult {
 
 abstract class VendingMachine {
   BuyResult buy(ProductID productID, Monies inputMoneys) {
-    final productHoldRacks =
-        racks().where((element) => element.rackFor.id == productID);
+    final productHoldRacks = _findRackByProductID(productID);
     if (productHoldRacks.isEmpty) {
       return FailureBuyResult(inputMoneys, BuyFailureReason.notExistProduct);
     }
@@ -58,15 +57,30 @@ abstract class VendingMachine {
     return SuccessBuyResult(productID, change, machine);
   }
 
-  VendingMachine refill(Product product);
+  VendingMachine deposit(Monies monies) {
+    return _withHoldMonies(holdMonies().concat(monies));
+  }
 
-  VendingMachine _replaceRack(StockRack rack);
+  VendingMachine refill(ProductID productID, StockCount count) {
+    final productHoldRacks = _findRackByProductID(productID);
+    if (productHoldRacks.isEmpty) {
+      throw Exception('容量オーバーやでException');
+    }
 
-  VendingMachine _withHoldMonies(Monies monies);
+    final addedRack = productHoldRacks.first.add(count);
+    return _replaceRack(addedRack);
+  }
+
+  List<StockRack> _findRackByProductID(ProductID id) =>
+      racks().where((element) => element.rackFor.id == id);
 
   List<StockRack> racks();
 
   Monies holdMonies();
+
+  VendingMachine _replaceRack(StockRack rack);
+
+  VendingMachine _withHoldMonies(Monies monies);
 }
 
 class StockRackID {}
@@ -88,8 +102,8 @@ class StockRack {
 
   bool existStock() => !count.isZero();
 
-  StockRack add() => StockRack(
-      id, capableSize, holdableProductCount, count.increment(), rackFor);
+  StockRack add(StockCount count) =>
+      StockRack(id, capableSize, holdableProductCount, count, rackFor);
 
   StockRack reduce() => StockRack(
       id, capableSize, holdableProductCount, count.decrement(), rackFor);
