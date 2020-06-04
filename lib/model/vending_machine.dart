@@ -64,7 +64,7 @@ abstract class VendingMachine {
   VendingMachine refill(ProductID productID, StockCount count) {
     final productHoldRacks = _findRackByProductID(productID);
     if (productHoldRacks.isEmpty) {
-      throw Exception('容量オーバーやでException');
+      throw Exception('Rackが見つからんぞException');
     }
 
     final addedRack = productHoldRacks.first.add(count);
@@ -98,13 +98,15 @@ class StockRack {
     this.holdableProductCount,
     this.count,
     this.rackFor,
-  );
+  ) {
+    // TODO: HoldableProductCountを満たすStackCountであるか検証
+  }
 
   bool existStock() => !count.isZero();
 
-  StockRack add(StockCount count) =>
-      StockRack(id, capableSize, holdableProductCount, count, rackFor);
-
+  StockRack add(StockCount count) {
+    return StockRack(id, capableSize, holdableProductCount, count, rackFor);
+  }
   StockRack reduce() => StockRack(
       id, capableSize, holdableProductCount, count.decrement(), rackFor);
 }
@@ -112,9 +114,13 @@ class StockRack {
 class StockCount {
   final int _value;
 
-  StockCount(this._value);
+  StockCount(this._value) {
+    assert(_value >= 0);
+  }
 
   bool isZero() => _value == 0;
+
+  StockCount add(StockCount other) => StockCount(_value + other._value);
 
   StockCount increment() => StockCount(_value + 1);
 
