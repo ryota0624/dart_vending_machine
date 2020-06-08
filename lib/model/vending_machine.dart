@@ -31,7 +31,45 @@ class FailureBuyResult extends BuyResult {
   );
 }
 
-abstract class VendingMachine {
+abstract class VendingMachineStatus {
+  static final pending = StatusPending();
+  static final active = StatusActive();
+  static final paused = StatusPaused();
+  static final stopped = StatusStopped();
+}
+
+class StatusPending extends VendingMachineStatus {}
+
+class StatusActive extends VendingMachineStatus {}
+
+class StatusPaused extends VendingMachineStatus {}
+
+class StatusStopped extends VendingMachineStatus {}
+
+class VendingMachineID {
+  static VendingMachineID generate() {}
+}
+
+class VendingMachine {
+  VendingMachine._(
+    this.id,
+    this.status,
+    this._racks,
+    this._holdMonies,
+  );
+
+  final VendingMachineID id;
+  final VendingMachineStatus status;
+
+  factory VendingMachine(VendingMachineID id) {
+    return VendingMachine._(
+      id,
+      VendingMachineStatus.pending,
+      [],
+      Monies([]),
+    );
+  }
+
   BuyResult buy(ProductID productID, Monies inputMoneys) {
     final productHoldRacks = _findRackByProductID(productID);
     if (productHoldRacks.isEmpty) {
@@ -67,6 +105,7 @@ abstract class VendingMachine {
       throw Exception('Rackが見つからんぞException');
     }
 
+    // TODO: firstがcapacity超えてたら別のものを試みる。
     final addedRack = productHoldRacks.first.add(count);
     return _replaceRack(addedRack);
   }
@@ -74,13 +113,42 @@ abstract class VendingMachine {
   List<StockRack> _findRackByProductID(ProductID id) =>
       racks().where((element) => element.rackFor.id == id);
 
-  List<StockRack> racks();
+  final List<StockRack> _racks;
+  final Monies _holdMonies;
 
-  Monies holdMonies();
+  List<StockRack> racks() => _racks;
 
-  VendingMachine _replaceRack(StockRack rack);
+  Monies holdMonies() => _holdMonies;
 
-  VendingMachine _withHoldMonies(Monies monies);
+  VendingMachine addRack(StockRack rack) {
+    final copied = racks();
+    copied.add(rack);
+    return VendingMachine._(id, status, copied, _holdMonies);
+  }
+
+  VendingMachine changeProvidingProduct(StockRackID rackID, Product product) {
+    final rack = _findRack(rackID);
+    final changedRack = rack.changeRackFor(product);
+    return _replaceRack(changedRack);
+  }
+
+  VendingMachine _replaceRack(StockRack rack) {
+    final filtered = _racks.where((element) => element.id == rack.id).toList();
+    filtered.add(rack);
+    return VendingMachine._(id, status, filtered, _holdMonies);
+  }
+
+  VendingMachine _withHoldMonies(Monies monies) =>
+      VendingMachine._(id, status, _racks, monies);
+
+
+  StockRack _findRack(StockRackID rackID) {
+    final rack = racks().where((element) => element.id == rackID);
+    if (rack.isEmpty) {
+      throw Exception('Rackが見つからんぞException');
+    }
+    return rack.first;
+  }
 }
 
 class StockRackID {}
@@ -90,7 +158,18 @@ class StockRack {
   final Size capableSize;
   final HoldableProductCount holdableProductCount;
   final StockCount count;
+  // TODO: RackはProductがない状態でも存在できるようにしたい。
   final Product rackFor;
+
+  StockRack changeRackFor(Product rackFor) {
+    return StockRack(
+      id,
+      capableSize,
+      holdableProductCount,
+      count,
+      rackFor,
+    )._asStockEmpty();
+  }
 
   StockRack(
     this.id,
@@ -99,6 +178,7 @@ class StockRack {
     this.count,
     this.rackFor,
   ) {
+    // TODO: rackForはcapableSizeを満たすか検証
     // TODO: HoldableProductCountを満たすStackCountであるか検証
   }
 
@@ -107,6 +187,11 @@ class StockRack {
   StockRack add(StockCount count) {
     return StockRack(id, capableSize, holdableProductCount, count, rackFor);
   }
+
+  StockRack _asStockEmpty() {
+    return StockRack(id, capableSize, holdableProductCount, StockCount(0), rackFor);
+  }
+
   StockRack reduce() => StockRack(
       id, capableSize, holdableProductCount, count.decrement(), rackFor);
 }

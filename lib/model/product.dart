@@ -1,6 +1,7 @@
 import 'package:vending_machine/model/money.dart';
 
-class ProductID {}
+class ProductID {
+}
 
 class Product {
   final ProductID id;
